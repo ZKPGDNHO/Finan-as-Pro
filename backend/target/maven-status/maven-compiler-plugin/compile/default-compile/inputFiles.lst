@@ -1,0 +1,14 @@
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/model/TipoLancamento.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/model/Usuario.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/dto/LancamentoRequest.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/dto/DashboardResponse.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/FinancasApplication.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/dto/LoginRequest.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/model/Lancamento.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/dto/AtualizarUsuarioRequest.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/controller/AuthController.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/dto/CadastroRequest.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/config/WebConfig.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/repository/UsuarioRepository.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/controller/LancamentoController.java
+/home/mr-zk/antigravity/backend/src/main/java/com/financas/repository/LancamentoRepository.java

@@ -1,0 +1,13 @@
+com/financas/controller/LancamentoController.class
+com/financas/model/Lancamento.class
+com/financas/dto/LoginRequest.class
+com/financas/FinancasApplication.class
+com/financas/repository/UsuarioRepository.class
+com/financas/dto/CadastroRequest.class
+com/financas/dto/LancamentoRequest.class
+com/financas/controller/AuthController.class
+com/financas/model/Usuario.class
+com/financas/model/TipoLancamento.class
+com/financas/repository/LancamentoRepository.class
+com/financas/dto/DashboardResponse.class
+com/financas/config/WebConfig.class
