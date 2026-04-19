@@ -13,7 +13,7 @@
 
       <div class="glass-panel max-w-md mx-auto">
         <div class="header-action">
-          <h2>{{ idEdicao ? 'Editar Lançamento' : 'Novo Lançamento' }}</h2>
+          <h2>Novo Lançamento</h2>
           <button class="btn btn-secondary btn-sm" @click="$router.push('/')">Voltar</button>
         </div>
 
@@ -42,7 +42,7 @@
             <input type="date" class="form-control" v-model="data" required />
           </div>
 
-          <div class="form-group" v-if="tipo === 'DESPESA' && !idEdicao" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; user-select: none;">
+          <div class="form-group" v-if="tipo === 'DESPESA'" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; user-select: none;">
              <label class="switch">
                <input type="checkbox" v-model="parcelado" />
                <span class="slider round"></span>
@@ -50,7 +50,7 @@
              <label style="margin: 0; cursor: pointer; color: var(--text-color);" @click="parcelado = !parcelado">Parcelar lançamento?</label>
           </div>
 
-          <div class="form-group animate-fade-in" v-if="tipo === 'DESPESA' && parcelado && !idEdicao" style="margin-top: 1rem;">
+          <div class="form-group animate-fade-in" v-if="tipo === 'DESPESA' && parcelado" style="margin-top: 1rem;">
              <label>Quantidade de Parcelas (1-12)</label>
              <input type="number" min="1" max="12" class="form-control" v-model="numeroParcelas" required />
           </div>
@@ -61,10 +61,7 @@
           <div class="button-group">
             <!-- Botão principal para CADASTRAR O LANÇAMENTO -->
             <button type="submit" class="btn btn-primary btn-block">
-              {{ loading ? 'Salvando...' : (idEdicao ? 'Atualizar Lançamento' : 'Cadastrar Lançamento') }}
-            </button>
-            <button v-if="idEdicao" type="button" class="btn btn-secondary btn-block mt-3" @click="cancelarEdicao">
-              Cancelar Edição
+              {{ loading ? 'Salvando...' : 'Cadastrar Lançamento' }}
             </button>
             
             <!-- Botão secundário para exbir o extrato -->
@@ -124,6 +121,40 @@
       </div>
 
     </main>
+
+    <!-- Modal de Edição -->
+    <div v-if="idEdicao !== null" class="modal-overlay">
+      <div class="glass-panel modal-content animate-fade-in">
+        <div class="header-action" style="margin-bottom: 1rem; border-bottom: none;">
+          <h3 style="margin: 0;">Editar Lançamento</h3>
+          <button type="button" class="btn btn-secondary btn-sm" @click="cancelarEdicao" style="padding: 0.1rem 0.5rem;">✕</button>
+        </div>
+        <form @submit.prevent="salvarEdicao">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Tipo</label>
+            <select class="form-control" v-model="formEdicao.tipo" required>
+              <option value="RECEITA">Receita</option>
+              <option value="DESPESA">Despesa</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Valor (R$)</label>
+            <input type="number" step="0.01" class="form-control" v-model="formEdicao.valor" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Descrição</label>
+            <input type="text" class="form-control" v-model="formEdicao.descricao" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Data</label>
+            <input type="date" class="form-control" v-model="formEdicao.data" required />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+            {{ loadingEdicao ? 'Salvando...' : 'Atualizar Lançamento' }}
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -132,6 +163,7 @@ import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import Header from '../components/Header.vue'
 import api from '../api/axios'
+import { useToast } from '../composables/useToast'
 
 /**
  * Módulo de formulário para cadastro e visualização de lançamentos.
@@ -150,6 +182,9 @@ const descricao = ref('')
 const today = new Date().toISOString().split('T')[0]
 const data = ref(today)
 const idEdicao = ref(null)
+const loadingEdicao = ref(false)
+const formEdicao = ref({ tipo: 'DESPESA', valor: '', descricao: '', data: '' })
+const { showToast } = useToast()
 
 const saldo = ref(null)
 const parcelado = ref(false)
@@ -189,56 +224,44 @@ const salvarLancamento = async () => {
   try {
     const usuarioId = sessionStorage.getItem('usuario_id')
     
-    if (idEdicao.value) {
+    if (parcelado.value && numeroParcelas.value > 1) {
+      let qty = Math.min(Math.max(parseInt(numeroParcelas.value), 1), 12)
+      let valorParcela = parseFloat(valor.value) / qty
+      
+      let requests = []
+      let parts = data.value.split('-')
+      let yearBase = parseInt(parts[0], 10)
+      let monthBase = parseInt(parts[1], 10) - 1
+      let dayBase = parseInt(parts[2], 10)
+      
+      for (let i = 0; i < qty; i++) {
+        let pDate = new Date(yearBase, monthBase + i, dayBase)
+        let y = pDate.getFullYear()
+        let m = String(pDate.getMonth() + 1).padStart(2, '0')
+        let d = String(pDate.getDate()).padStart(2, '0')
+        let dtStr = `${y}-${m}-${d}`
+        
+        let desc = `${descricao.value} (${i+1}/${qty})`
+        
+        let payload = {
+          tipo: tipo.value,
+          valor: parseFloat(valorParcela.toFixed(2)),
+          descricao: desc,
+          data: dtStr
+        }
+        requests.push(api.post(`/lancamentos/${usuarioId}`, payload))
+      }
+      await Promise.all(requests)
+      showToast('Lançamentos cadastrados com sucesso!', 'success')
+    } else {
       const payload = {
         tipo: tipo.value,
         valor: parseFloat(valor.value),
         descricao: descricao.value,
         data: data.value
       }
-      await api.put(`/lancamentos/${idEdicao.value}`, payload)
-      idEdicao.value = null
-      alert('Lançamento atualizado com sucesso!')
-    } else {
-      if (parcelado.value && numeroParcelas.value > 1) {
-        let qty = Math.min(Math.max(parseInt(numeroParcelas.value), 1), 12)
-        let valorParcela = parseFloat(valor.value) / qty
-        
-        let requests = []
-        let parts = data.value.split('-')
-        let yearBase = parseInt(parts[0], 10)
-        let monthBase = parseInt(parts[1], 10) - 1
-        let dayBase = parseInt(parts[2], 10)
-        
-        for (let i = 0; i < qty; i++) {
-          let pDate = new Date(yearBase, monthBase + i, dayBase)
-          let y = pDate.getFullYear()
-          let m = String(pDate.getMonth() + 1).padStart(2, '0')
-          let d = String(pDate.getDate()).padStart(2, '0')
-          let dtStr = `${y}-${m}-${d}`
-          
-          let desc = `${descricao.value} (${i+1}/${qty})`
-          
-          let payload = {
-            tipo: tipo.value,
-            valor: parseFloat(valorParcela.toFixed(2)),
-            descricao: desc,
-            data: dtStr
-          }
-          requests.push(api.post(`/lancamentos/${usuarioId}`, payload))
-        }
-        await Promise.all(requests)
-        alert('Lançamentos cadastrados com sucesso!')
-      } else {
-        const payload = {
-          tipo: tipo.value,
-          valor: parseFloat(valor.value),
-          descricao: descricao.value,
-          data: data.value
-        }
-        await api.post(`/lancamentos/${usuarioId}`, payload)
-        alert('Lançamento cadastrado com sucesso!')
-      }
+      await api.post(`/lancamentos/${usuarioId}`, payload)
+      showToast('Lançamento cadastrado com sucesso!', 'success')
     }
     
     // Limpar form
@@ -293,30 +316,39 @@ const extratoOrdenado = computed(() => {
 
 const prepararEdicao = (item) => {
   idEdicao.value = item.id
-  tipo.value = item.tipo
-  valor.value = item.valor
-  descricao.value = item.descricao
-  data.value = item.data
-  window.scrollTo({ top: 0, behavior: 'smooth' })
+  formEdicao.value = { ...item }
 }
 
 const cancelarEdicao = () => {
   idEdicao.value = null
-  descricao.value = ''
-  valor.value = ''
-  tipo.value = 'DESPESA'
-  data.value = today
+}
+
+const salvarEdicao = async () => {
+  loadingEdicao.value = true
+  try {
+    await api.put(`/lancamentos/${idEdicao.value}`, formEdicao.value)
+    showToast('Lançamento atualizado com sucesso!', 'success')
+    idEdicao.value = null
+    await carregarExtrato()
+    await carregarSaldo()
+  } catch (err) {
+    console.error("Erro ao atualizar:", err)
+    showToast('Erro ao atualizar lançamento.', 'danger')
+  } finally {
+    loadingEdicao.value = false
+  }
 }
 
 const excluirLancamento = async (id) => {
   if (!confirm('Deseja realmente excluir este lançamento?')) return
   try {
     await api.delete(`/lancamentos/${id}`)
+    showToast('Lançamento excluído.', 'success')
     await carregarExtrato() // Recarrega os dados
     await carregarSaldo()
   } catch(err) {
     console.error("Erro ao excluir lançamento: ", err)
-    alert("Falha ao excluir o lançamento.")
+    showToast("Falha ao excluir o lançamento.", 'danger')
   }
 }
 
@@ -410,6 +442,30 @@ const formatarData = (dataIso) => {
 }
 .action-btn.text-danger:hover {
   color: var(--danger);
+}
+
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  width: 90%;
+  max-width: 400px;
+  background: var(--bg-dark);
+  padding: 2rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  box-shadow: 0 10px 25px rgba(0,0,0,0.5);
 }
 
 /* Switch CSS */

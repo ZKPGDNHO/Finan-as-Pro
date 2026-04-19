@@ -31,8 +31,8 @@
               <button class="btn btn-primary" style="width: 100%; margin-top: 1rem;" @click="iniciarEdicao">
                 Editar Perfil
               </button>
-              <button class="btn btn-secondary" style="width: 100%;" @click="$router.push('/relatorio')">
-                Gerar Relatório Mensal
+              <button class="btn btn-secondary" style="width: 100%;" @click="gerarRelatorioSistema" :disabled="gerandoRelatorio">
+                {{ gerandoRelatorio ? 'Gerando...' : 'Gerar Relatório do Sistema' }}
               </button>
             </div>
           </div>
@@ -92,9 +92,14 @@
 import { ref, onMounted, reactive } from 'vue'
 import Header from '../components/Header.vue'
 import api from '../api/axios'
+import jsPDF from 'jspdf'
+import autoTable from 'jspdf-autotable'
+import { useToast } from '../composables/useToast'
 
 const usuario = ref({})
 const loading = ref(true)
+const gerandoRelatorio = ref(false)
+const { showToast } = useToast()
 
 const isEditing = ref(false)
 const saving = ref(false)
@@ -139,6 +144,46 @@ const cancelarEdicao = () => {
   errorMsg.value = ''
 }
 
+const gerarRelatorioSistema = async () => {
+  gerandoRelatorio.value = true
+  try {
+    const usuarioId = getUsuarioId()
+    const { data: dashboard } = await api.get(`/lancamentos/dashboard/${usuarioId}`)
+    
+    const doc = new jsPDF()
+    doc.setFontSize(18)
+    doc.text('Relatorio Geral do Sistema', 14, 22)
+    
+    doc.setFontSize(12)
+    doc.text(`Usuário: ${usuario.value.nome}`, 14, 32)
+    doc.text(`E-mail: ${usuario.value.email}`, 14, 38)
+    
+    const formatter = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' })
+    
+    doc.text(`Resumo Financeiro Financeiro:`, 14, 50)
+    
+    autoTable(doc, {
+      startY: 55,
+      head: [['Dimensão Estratégica', 'Métrica']],
+      body: [
+        ['Saldo Atual', formatter.format(dashboard.saldo)],
+        ['Total de Receitas', formatter.format(dashboard.totalReceitas)],
+        ['Total de Despesas', formatter.format(dashboard.totalDespesas)],
+        ['Total de Lançamentos Registrados no Sistema', dashboard.ultimosLancamentos.length.toString()]
+      ],
+      theme: 'grid',
+      headStyles: { fillColor: [41, 128, 185] }
+    })
+    
+    doc.save('relatorio-sistema.pdf')
+  } catch (error) {
+    console.error("Erro ao gerar relatório do sistema:", error)
+    showToast("Ocorreu um erro ao gerar o relatório. Tente novamente.", 'danger')
+  } finally {
+    gerandoRelatorio.value = false
+  }
+}
+
 const onFileChange = (e) => {
   const file = e.target.files[0]
   if (!file) return
@@ -167,6 +212,7 @@ const salvarEdicao = async () => {
     sessionStorage.setItem('usuario_nome', usuario.value.nome)
     
     isEditing.value = false
+    showToast('Perfil atualizado com sucesso!', 'success')
   } catch (error) {
     console.error("Erro ao atualizar o perfil:", error)
     errorMsg.value = "Falha ao salvar. Verifique os dados e tente novamente."

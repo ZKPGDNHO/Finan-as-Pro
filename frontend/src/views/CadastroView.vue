@@ -40,6 +40,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '../api/axios'
+import { useToast } from '../composables/useToast'
 
 const nome = ref('')
 const email = ref('')
@@ -47,6 +48,7 @@ const senha = ref('')
 const error = ref('')
 const loading = ref(false)
 const router = useRouter()
+const { showToast } = useToast()
 
 const handleCadastro = async () => {
   loading.value = true
@@ -59,7 +61,7 @@ const handleCadastro = async () => {
       senha: senha.value
     })
     
-    alert('Cadastro realizado com sucesso! Faça seu login.')
+    showToast('Cadastro realizado com sucesso! Faça seu login.', 'success')
     router.push('/login')
   } catch (err) {
     error.value = err.response?.data || 'Erro de conexão. Tente novamente.'

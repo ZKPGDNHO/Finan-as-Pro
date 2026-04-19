@@ -61,40 +61,41 @@
         </div>
       </div>
 
-      <!-- Modal de Edição -->
-      <div v-if="idEdicao !== null" class="modal-overlay">
-        <div class="glass-panel modal-content animate-fade-in">
-          <div class="header-action" style="margin-bottom: 1rem; border-bottom: none;">
-            <h3 style="margin: 0;">Editar Lançamento</h3>
-            <button class="btn btn-secondary btn-sm" @click="cancelarEdicao" style="padding: 0.1rem 0.5rem;">✕</button>
-          </div>
-          <form @submit.prevent="salvarEdicao">
-            <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom: 0.5rem;">Tipo</label>
-              <select class="form-control" v-model="formEdicao.tipo" required>
-                <option value="RECEITA">Receita</option>
-                <option value="DESPESA">Despesa</option>
-              </select>
-            </div>
-            <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom: 0.5rem;">Valor (R$)</label>
-              <input type="number" step="0.01" class="form-control" v-model="formEdicao.valor" required />
-            </div>
-            <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom: 0.5rem;">Descrição</label>
-              <input type="text" class="form-control" v-model="formEdicao.descricao" required />
-            </div>
-            <div class="form-group" style="margin-bottom: 1rem;">
-              <label style="display:block; margin-bottom: 0.5rem;">Data</label>
-              <input type="date" class="form-control" v-model="formEdicao.data" required />
-            </div>
-            <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
-              {{ loadingEdicao ? 'Salvando...' : 'Atualizar Lançamento' }}
-            </button>
-          </form>
-        </div>
-      </div>
     </main>
+
+    <!-- Modal de Edição -->
+    <div v-if="idEdicao !== null" class="modal-overlay">
+      <div class="glass-panel modal-content animate-fade-in">
+        <div class="header-action" style="margin-bottom: 1rem; border-bottom: none;">
+          <h3 style="margin: 0;">Editar Lançamento</h3>
+          <button class="btn btn-secondary btn-sm" @click="cancelarEdicao" style="padding: 0.1rem 0.5rem;">✕</button>
+        </div>
+        <form @submit.prevent="salvarEdicao">
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Tipo</label>
+            <select class="form-control" v-model="formEdicao.tipo" required>
+              <option value="RECEITA">Receita</option>
+              <option value="DESPESA">Despesa</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Valor (R$)</label>
+            <input type="number" step="0.01" class="form-control" v-model="formEdicao.valor" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Descrição</label>
+            <input type="text" class="form-control" v-model="formEdicao.descricao" required />
+          </div>
+          <div class="form-group" style="margin-bottom: 1rem;">
+            <label style="display:block; margin-bottom: 0.5rem;">Data</label>
+            <input type="date" class="form-control" v-model="formEdicao.data" required />
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 1rem;">
+            {{ loadingEdicao ? 'Salvando...' : 'Atualizar Lançamento' }}
+          </button>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -104,6 +105,7 @@ import Header from '../components/Header.vue'
 import api from '../api/axios'
 import jsPDF from 'jspdf'
 import autoTable from 'jspdf-autotable'
+import { useToast } from '../composables/useToast'
 
 /**
  * View para o Relatório Completo.
@@ -113,6 +115,7 @@ import autoTable from 'jspdf-autotable'
  */
 const lancamentos = ref([])
 const loading = ref(true)
+const { showToast } = useToast()
 
 const idEdicao = ref(null)
 const loadingEdicao = ref(false)
@@ -167,12 +170,12 @@ const salvarEdicao = async () => {
   loadingEdicao.value = true
   try {
     await api.put(`/lancamentos/${idEdicao.value}`, formEdicao.value)
-    alert('Lançamento atualizado com sucesso!')
+    showToast('Lançamento atualizado com sucesso!', 'success')
     idEdicao.value = null
     await carregarLancamentos()
   } catch (err) {
     console.error("Erro ao atualizar:", err)
-    alert('Erro ao atualizar lançamento.')
+    showToast('Erro ao atualizar lançamento.', 'danger')
   } finally {
     loadingEdicao.value = false
   }
@@ -185,7 +188,7 @@ const excluirLancamento = async (id) => {
     await carregarLancamentos()
   } catch (err) {
     console.error("Erro ao excluir:", err)
-    alert("Falha ao excluir o lançamento.")
+    showToast("Falha ao excluir o lançamento.", 'danger')
   }
 }
 
