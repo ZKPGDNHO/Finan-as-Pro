@@ -27,10 +27,17 @@
             <div 
               v-for="(cell, index) in calendarCells" 
               :key="index" 
-              :class="['calendar-day', { empty: cell.isEmpty }]"
+              :class="['calendar-day', { empty: cell.isEmpty, 'is-weekend': getDateStatus(cell.dateStr).weekend, 'is-holiday': getDateStatus(cell.dateStr).holiday }]"
+              :title="getDateStatus(cell.dateStr).name"
             >
               <template v-if="!cell.isEmpty">
-                <span class="day-number">{{ cell.dayNumber }}</span>
+                <div style="display: flex; flex-direction: column; align-items: flex-start; width: 100%; gap: 0.2rem;">
+                  <span class="day-number">{{ cell.dayNumber }}</span>
+                  <div v-if="getDateStatus(cell.dateStr).holiday" class="badge-holiday" style="max-width: 100%; white-space: normal; text-align: center; line-height: 1.2; word-break: break-word; padding: 0.2rem 0.3rem;" :title="getDateStatus(cell.dateStr).name">
+                    <div style="font-size: 0.65rem;">Feriado</div>
+                    <div style="font-size: 0.5rem; opacity: 0.9;">({{ getDateStatus(cell.dateStr).name }})</div>
+                  </div>
+                </div>
                 <div class="day-content" style="gap: 0.25rem; width: 100%;">
                   <span 
                     v-for="parcela in parcelasDoMes(cell.dateStr)" 
@@ -67,7 +74,12 @@
                </thead>
                <tbody>
                  <tr v-for="item in parcelasOrdenadas" :key="item.id">
-                   <td>{{ formatarData(item.data) }}</td>
+                   <td>
+                     {{ formatarData(item.data) }}
+                     <br v-if="getDateStatus(item.data).holiday || getDateStatus(item.data).weekend">
+                     <span v-if="getDateStatus(item.data).holiday" class="badge-holiday inline">{{ getDateStatus(item.data).name }}</span>
+                     <span v-else-if="getDateStatus(item.data).weekend" class="badge-weekend inline">Fim de Semana</span>
+                   </td>
                    <td class="font-weight-bold" style="color: var(--warning);">{{ item.descricao }}</td>
                    <td class="text-right text-danger">
                      R$ {{ formatarMoeda(item.valor) }}
@@ -83,7 +95,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import Header from '../components/Header.vue'
 import api from '../api/axios'
 
@@ -109,6 +121,44 @@ const nextMonth = () => {
     currentYear.value++
   } else {
     currentMonth.value++
+  }
+}
+
+const holidaysForYear = ref({})
+const fetchingHolidays = ref({})
+
+const fetchHolidays = async (year) => {
+  if (holidaysForYear.value[year] || fetchingHolidays.value[year]) return;
+  fetchingHolidays.value[year] = true;
+  try {
+    const res = await api.get(`/holidays/${year}`)
+    holidaysForYear.value[year] = res.data
+  } catch (err) {
+    console.error("Erro buscar feriados", err)
+  } finally {
+    fetchingHolidays.value[year] = false;
+  }
+}
+
+watch(currentYear, (newYear) => {
+  fetchHolidays(newYear)
+}, { immediate: true })
+
+const getDateStatus = (dateStr) => {
+  if (!dateStr) return { holiday: false, weekend: false, name: '' }
+  const parts = dateStr.split('-')
+  const year = parseInt(parts[0], 10)
+  
+  const d = new Date(dateStr + 'T00:00:00')
+  const isWeekend = d.getDay() === 0 || d.getDay() === 6
+  
+  const holidays = holidaysForYear.value[year] || []
+  const holiday = holidays.find(h => h.date === dateStr)
+  
+  return {
+    weekend: isWeekend,
+    holiday: !!holiday,
+    name: holiday ? holiday.name : ''
   }
 }
 
@@ -282,5 +332,36 @@ body.light-theme .calendar-day {
 }
 .animate-pulse {
   animation: pulse-once 1s ease-in-out infinite;
+}
+
+.calendar-day.is-weekend {
+  background: rgba(245, 158, 11, 0.05);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+.calendar-day.is-holiday {
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.3);
+}
+
+.badge-holiday {
+  display: inline-block;
+  background-color: var(--primary, #3b82f6);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+.badge-weekend {
+  display: inline-block;
+  background-color: var(--warning, #f59e0b);
+  color: #fff;
+  font-size: 0.65rem;
+  padding: 0.1rem 0.3rem;
+  border-radius: 4px;
+  font-weight: bold;
+}
+.badge-holiday.inline, .badge-weekend.inline {
+  margin-top: 0.2rem;
 }
 </style>

@@ -40,6 +40,16 @@
           <div class="form-group">
             <label>Data</label>
             <input type="date" class="form-control" v-model="data" required />
+            
+            <div v-if="holidayLoading" class="text-muted" style="font-size: 0.8rem; margin-top: 0.5rem;">Validando data...</div>
+            <div v-else-if="holidayInfo.holiday || holidayInfo.weekend" class="holiday-alert animate-fade-in">
+              <span v-if="holidayInfo.holiday">Esta parcela vence em um feriado nacional (<strong>{{ holidayInfo.holidayName }}</strong>).</span>
+              <span v-else>Esta parcela vence em um final de semana.</span>
+              
+              <button type="button" class="btn btn-sm btn-outline-warning" @click="avancarDiaUtil" style="margin-top: 0.5rem; display: block; font-size: 0.8rem;">
+                Mover vencimento para próximo dia útil?
+              </button>
+            </div>
           </div>
 
           <div class="form-group" v-if="tipo === 'DESPESA'" style="margin-top: 1rem; display: flex; align-items: center; gap: 0.75rem; user-select: none;">
@@ -159,7 +169,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import Header from '../components/Header.vue'
 import api from '../api/axios'
@@ -185,6 +195,34 @@ const idEdicao = ref(null)
 const loadingEdicao = ref(false)
 const formEdicao = ref({ tipo: 'DESPESA', valor: '', descricao: '', data: '' })
 const { showToast } = useToast()
+
+const holidayInfo = ref({ holiday: false, weekend: false, holidayName: '' })
+const holidayLoading = ref(false)
+
+watch(data, async (newDate) => {
+  if (!newDate) {
+    holidayInfo.value = { holiday: false, weekend: false, holidayName: '' }
+    return
+  }
+  holidayLoading.value = true
+  try {
+    const res = await api.get(`/holidays/check?date=${newDate}`)
+    holidayInfo.value = res.data
+  } catch (err) {
+    console.error("Erro ao validar data:", err)
+  } finally {
+    holidayLoading.value = false
+  }
+}, { immediate: true })
+
+const avancarDiaUtil = () => {
+  let d = new Date(data.value + 'T00:00:00')
+  d.setDate(d.getDate() + 1)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  data.value = `${y}-${m}-${day}`
+}
 
 const saldo = ref(null)
 const parcelado = ref(false)
@@ -475,4 +513,29 @@ const formatarData = (dataIso) => {
 .slider:before { position: absolute; content: ""; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .4s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
 input:checked + .slider { background-color: var(--primary); }
 input:checked + .slider:before { transform: translateX(20px); }
+
+.holiday-alert {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background-color: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-left: 4px solid var(--warning, #f59e0b);
+  border-radius: 6px;
+  color: var(--text-color);
+  font-size: 0.85rem;
+}
+
+.btn-outline-warning {
+  background: transparent;
+  border: 1px solid var(--warning, #f59e0b);
+  color: var(--warning, #f59e0b);
+  transition: all 0.2s;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.btn-outline-warning:hover {
+  background: var(--warning, #f59e0b);
+  color: #fff;
+}
 </style>
